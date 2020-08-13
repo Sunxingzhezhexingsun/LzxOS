@@ -32,14 +32,14 @@ int 10h             ;BIOS中断（显示服务）
 ;========== display on screen
 ;========== "LzxOS Start Booting ..."
 mov ax, 1301h       ;AH功能编号（写字符串） AL=写入模式，AL=1时字符串属性由BL提供，CX提供字符串长度(字节)，光标移动至字符串末端
-mov bx, 000fh       ;1 000 0 011 => 字体闪烁 背景黑色 正常亮度 字体青色 
+mov bx, 0002h       ;0 000 0 010 => 字体不闪烁 背景黑色 正常亮度 字体绿色 
 mov dx, 0           ;DH=游标行号  DL=游标列号
-mov cx, 10          ;字符串长度
+mov cx, 24          ;字符串长度
 push ax
 mov ax, ds          ;DS 数据段基地址
 mov es, ax
 pop ax
-mov bp StartBootMsg ; ES:BP 字符串地址
+mov bp, StartBootMsg ; ES:BP 字符串地址
 int 10h
 
 ;========== reset floppy
