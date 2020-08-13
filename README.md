@@ -39,5 +39,5 @@ Run:
 
 <img src="README.assets/image-20200814002712828.png" style="zoom:50%;" />
 
-
+> 鼠标点进去QEMU窗口后会锁定出不来，我是mac上开的vmware ubuntu，直接Ctrl+空格的话是鼠标回到mac主机，要从QEMU回到ubuntu虚拟机的话，得按ctrl+option+空格
 
