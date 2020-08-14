@@ -3,8 +3,7 @@
 ; BIOS中断向量表：https://blog.csdn.net/piaopiaopiaopiaopiao/article/details/9735633
 ; 通过BIOS中断来实现各种功能
 
-org 0x7c00
-
+org 0x7c00          ;伪指令，指定起始地址
 StackBase equ 0x7c00
 
 Lable_Start:
