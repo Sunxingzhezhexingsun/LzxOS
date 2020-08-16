@@ -86,31 +86,29 @@ Func_ReadOneSector:
     push bp
     mov bp, bp
     sub esp, 2
-    mov byte [bp-2], cl ;起始扇区号
+    mov byte [bp-2], cl ;需要读的扇区数量
     push bx ;目标缓冲区
     mov bl, [BPB_SecPerTrk] ;每磁道扇区数
-    div bl
-    inc ah
-    mov cl, ah
+    div bl  ; ax/bl, AL=商，AH=余数
+    inc ah  ; ah += 1 (起始扇区号，磁道内的扇区号从1开始计数，所以+1)
+    mov cl, ah  ;扇区号
     mov dh, al
-    shr al, 1
-    mov ch, al
-    and dh, 1
-    pop bx
+    shr al, 1   ; al = al >> 1 (柱面号)
+    mov ch, al  ;磁道号(柱面号)的低8位
+    and dh, 1  ; dh = al & 1 (磁头号)
+    pop bx  ;目标缓冲区(物理内存的地址)
     mov dl, [BS_DrvNum] ;int13h的驱动器号
 Label_GoOnReading:
-    mov ah, 2
-    mov al, byte [bp-2]
-    int 13h
-    jc Label_GoOnReading
-    ; add esp, 2  ;平衡栈
+    mov ah, 2   ;中断功能号(读取磁盘扇区)
+    mov al, byte [bp-2] ;读入的扇区数
+    int 13h     ;发起中断
+    jc Label_GoOnReading  ;读取成功时，CF标志位=0，继续往下执行，否则再跳回去尝试读取
+    add esp, 2  ;平衡栈
     pop bp
     ret
 
-
     ;========== Data:
 StartBootMsg: db "LzxOS Start Booting ..."
-
 
 
     ;========== fill sector
