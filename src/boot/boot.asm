@@ -64,7 +64,7 @@ Label_Boot_Start:
     mov ax, 1301h       ;AH功能编号（写字符串） AL=写入模式，AL=1时字符串属性由BL提供，CX提供字符串长度(字节)，光标移动至字符串末端
     mov bx, 0002h       ;0 000 0 010 => 字体不闪烁 背景黑色 正常亮度 字体绿色 
     mov dx, 0           ;DH=游标行号  DL=游标列号
-    mov cx, 24          ;字符串长度
+    mov cx, 23          ;字符串长度
     push ax
     mov ax, ds          ;DS 数据段基地址
     mov es, ax
@@ -174,8 +174,8 @@ Label_GoOnReading:
     ret
 
     ;========== Data (相当于 .data)
-StartBootMsg db "LzxOS Start Booting ..."
-NoLoaderMsg db "ERROR: Loader Not Found !!!"
+StartBootMsg db "LzxOS Start Booting ...", 0
+NoLoaderMsg db "ERROR: Loader Not Found !!!", 0
 LoaderFileName db "LOADER  BIN", 0
 
     ;========== Variable (相当于 .bss)
