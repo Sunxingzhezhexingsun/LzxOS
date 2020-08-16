@@ -6,7 +6,7 @@
 org 0x7c00          ;伪指令，指定起始地址
 StackBase equ 0x7c00
 
-Lable_Start:
+Boot_Start:
 
 ;===将CS寄存器的段基地址设置到DS、ES、SS等寄存器中
 mov ax, cs

@@ -2,6 +2,7 @@
 
 ; BIOS中断向量表：https://blog.csdn.net/piaopiaopiaopiaopiao/article/details/9735633
 ; 通过BIOS中断来实现各种功能
+; 为软盘创建FAT12文件系统
 
 org 0x7c00          ;伪指令，指定起始地址
 StackBase equ 0x7c00
@@ -12,8 +13,8 @@ TotalRootDirSectors equ 14      ;根目录区占用的扇区数 (224 * 32)/512 (
 FAT1SectorStart equ 1           ;FAT表1的起始扇区号
 RootDirSectorStart equ 19       ;根目录起始扇区号
 
-
-    jmp	short Label_Start
+FAT12_Info:                     ;FAT12文件系统结构信息
+    jmp	short Boot_Start
     nop
     BS_OEMName	db	'Lzx Boot'
     BPB_BytesPerSec	dw	512     ;每扇区字节数
@@ -35,9 +36,8 @@ RootDirSectorStart equ 19       ;根目录起始扇区号
     BS_VolLab	db	'boot loader'   ;卷标(磁盘名)
     BS_FileSysType	db	'FAT12   '  ;文件系统类型
 
-
-Lable_Start:                    ;Boot引导代码
-
+;========== Boot 引导代码
+Boot_Start:
     ;===将CS寄存器的段基地址设置到DS、ES、SS等寄存器中
     mov ax, cs
     mov ds, ax
@@ -78,8 +78,42 @@ Lable_Start:                    ;Boot引导代码
     int 13h             ;BIOS中断（低阶磁盘服务）
     jmp $
 
+;========== 从软盘中读取一个扇区
+; arg1 AX 起始扇区号
+; arg2 CL 读入扇区数量
+; arg3 ES:BX 目标缓冲区起始地址
+Func_ReadOneSector:
+    push bp
+    mov bp, bp
+    sub esp, 2
+    mov byte [bp-2], cl ;起始扇区号
+    push bx ;目标缓冲区
+    mov bl, [BPB_SecPerTrk] ;每磁道扇区数
+    div bl
+    inc ah
+    mov cl, ah
+    mov dh, al
+    shr al, 1
+    mov ch, al
+    and dh, 1
+    pop bx
+    mov dl, [BS_DrvNum] ;int13h的驱动器号
+Label_GoOnReading:
+    mov ah, 2
+    mov al, byte [bp-2]
+    int 13h
+    jc Label_GoOnReading
+    ; add esp, 2  ;平衡栈
+    pop bp
+    ret
+
+
     ;========== Data:
-    StartBootMsg: db "LzxOS Start Booting ..."
+StartBootMsg: db "LzxOS Start Booting ..."
+
+
+
+    ;========== fill sector
     times 510-($-$$) db 0   ;将当前扇区用0字节填充
                             ;($-$$)表示当前行编译后的地址-本节程序的起始地址(这里只有一个section)，times伪指令用于重复操作
     dw 0xaa55           ; 0x55 0xAA 引导扇区的结尾标记 
