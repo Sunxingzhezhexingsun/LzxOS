@@ -127,7 +127,6 @@ Label_Goto_Next_Sector_In_Root_Dir:
 
 Label_LoaderBin_Found:
 
-
 ;========== display Loader not found message
 Label_LoaderBin_NotFound:
     mov	ax,	1301h
@@ -142,9 +141,7 @@ Label_LoaderBin_NotFound:
     int	10h
     jmp	$
 
-
-
-;========== 从软盘中读取N个扇区
+;========== 函数Func_ReadSector 从软盘中读取N个扇区
 ; arg1 AX 起始扇区号
 ; arg2 CL 读入扇区数量
 ; arg3 ES:BX 目标缓冲区起始地址
