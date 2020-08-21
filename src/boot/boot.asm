@@ -170,6 +170,47 @@ Label_GoOnReading:
     pop bp
     ret
 
+;========== Parse FAT Entry
+; arg1 AX = FAT Entry Number
+; ret AX = Next FAT Entry Number
+Func_ParseFATEntry:
+    push es
+    push bx
+    push ax
+    mov ax, 00
+    mov es, ax
+    pop ax              ; ax=FAT表项号
+    mov byte [Odd], 0
+    mov bx, 3
+    mul bx              ; ax=ax*3
+    mov bx, 2
+    div bx              ; ax=ax/2  ax=商 dx=余数
+    cmp dx, 0
+    jz Label_Even       ; 余数为0则跳转
+    mov byte [Odd], 1   ; FAT号为奇数
+Label_Even:
+    xor dx, dx
+    mov bx, [BPB_BytesPerSec]
+    div bx              ; ax=ax/bx 商值ax为FAT表项的偏移扇区号，余数dx为扇区内偏移
+    push dx
+    add ax, [FAT1SectorStart]  ; arg1=扇区号
+    mov cl, 2                  ; arg2=读入的扇区数量 这里读取2个扇区，可以应对FAT表项跨扇区的情况
+    mov bx 8000h               ; arg3=目标缓冲区地址
+    call Func_ReadSector
+    pop dx
+    add bx, dx          ; FAT表项所在的地址
+    mov ax, [es:bx]     ; 直接读取16字节
+    cmp byte [Odd], 0
+    jz Label_Even_2    ; 表项号是偶数则跳转
+    shr ax, 4           ; 表项号是奇数，高12位才是表项的数据，因此右移四位，舍弃低4位
+Label_Even_2:
+    and ax, 0fffh       ; 表项号是偶数，低12位才是表项的数据，因此只取低12字节
+    pop bx
+    pop es
+    ret
+
+
+
     ;========== Data (相当于 .data)
 StartBootMsg db "LzxOS Start Booting ...", 0
 NoLoaderMsg db "ERROR: Loader Not Found !!!", 0
@@ -178,6 +219,7 @@ LoaderFileName db "LOADER  BIN", 0
     ;========== Variable (相当于 .bss)
 SectorNumber dw 0
 RootDirSizeForLoop dw TotalRootDirSectors
+Odd db 0  ;FAT表项的奇偶校验位
 
     ;========== fill sector
     times 510-($-$$) db 0   ;将当前扇区用0字节填充
