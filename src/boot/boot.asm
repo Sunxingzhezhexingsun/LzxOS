@@ -1,4 +1,4 @@
-; Boot Program of LzxOSs
+; Boot
 ; nasm boot.asm -o boot.bin
 ; 编译出来是Intel8086 16bit指令格式
 ; BIOS中断向量表：https://blog.csdn.net/piaopiaopiaopiaopiao/article/details/9735633
@@ -34,7 +34,7 @@ FAT12_Info:                     ;FAT12文件系统结构信息
     BS_Reserved1	db	0
     BS_BootSig	db	0x29        ;扩展引导标记(0x29)
     BS_VolID	dd	0           ;卷序列号
-    BS_VolLab	db	'boot loader'   ;卷标(磁盘名)
+    BS_VolLab	db	'bootloader',0   ;卷标(磁盘名)
     BS_FileSysType	db	'FAT12   '  ;文件系统类型
 
 ;========== Boot 引导代码
@@ -60,11 +60,11 @@ Label_Boot_Start:
     int 10h             ;BIOS中断（显示服务）
 
 ;========== display on screen
-;========== "LzxOS Start Booting ..."
+;========== "LzxOS Start Boot"
     mov ax, 1301h       ;AH功能编号（写字符串） AL=写入模式，AL=1时字符串属性由BL提供，CX提供字符串长度(字节)，光标移动至字符串末端
-    mov bx, 0002h       ;0 000 0 010 => 字体不闪烁 背景黑色 正常亮度 字体绿色 
+    mov bx, 000fh      ;0 000 1 111 => 字体不闪烁 背景黑色 高亮度 字体白色
     mov dx, 0           ;DH=游标行号  DL=游标列号
-    mov cx, 23          ;字符串长度
+    mov cx, 16          ;字符串长度
     push ax
     mov ax, ds          ;DS 数据段基地址
     mov es, ax
@@ -125,8 +125,6 @@ Label_Goto_Next_Sector_In_Root_Dir:
     add	word [SectorNumber],	1
     jmp	Lable_Search_In_Root_Dir_Begin
 
-Label_LoaderBin_Found:
-
 ;========== display Loader not found message
 Label_LoaderBin_NotFound:
     mov	ax,	1301h
@@ -140,6 +138,40 @@ Label_LoaderBin_NotFound:
     mov	bp,	NoLoaderMsg
     int	10h
     jmp	$
+
+;========== load loader.bin to memory, and jmp to loader
+Label_LoaderBin_Found:      
+    and di, 0ffe0h               ;0x20对齐
+    add di, 01ah                 ;DIR_FstClus
+    mov cx, word [es:di]        ;2bytes
+    mov ax, LoaderBase
+    mov bx, LoaderOffset
+    mov es, ax
+Label_Go_On_Loading_LoaderBin:
+    push cx
+    add cx, RootDirStartSectorNum
+    add cx, TotalRootDirSectors
+    sub cx, 2                   ;FAT表项0和1是不能用的，FAT[2]对应数据区的0簇
+    mov ax, cx
+    push ax
+    push bx
+    mov	ah,	0eh
+    mov	al,	'.'
+    mov	bl,	0fh
+    int	10h                     ;输出一个字符 “.”
+    pop bx
+    pop ax
+    mov cl, 1
+    call Func_ReadSector
+    pop ax
+    call Func_ParseFATEntry
+    mov cx, ax
+    cmp cx, 0fffh               ;FAT表项内容为0xfff表示这是文件的最后一个簇
+    jz Label_Load_LoaderBin_Done    ;loader.bin加载完成
+    add bx, [BPB_BytesPerSec]   ;地址+=512
+    jmp Label_Go_On_Loading_LoaderBin   ;继续加载下一个簇到内存
+Label_Load_LoaderBin_Done:
+    jmp LoaderBase:LoaderOffset ;跳转到loader.bin加载到内存中的地址
 
 ;========== 函数Func_ReadSector 从软盘中读取N个扇区
 ; arg1 AX 起始扇区号
@@ -170,7 +202,7 @@ Label_GoOnReading:
     pop bp
     ret
 
-;========== Parse FAT Entry
+;========== Parse FAT Entry 根据FAT表项索引出下一个簇号
 ; arg1 AX = FAT Entry Number
 ; ret AX = Next FAT Entry Number
 Func_ParseFATEntry:
@@ -193,9 +225,9 @@ Label_Even:
     mov bx, [BPB_BytesPerSec]
     div bx              ; ax=ax/bx 商值ax为FAT表项的偏移扇区号，余数dx为扇区内偏移
     push dx
-    add ax, [FAT1SectorStart]  ; arg1=扇区号
+    add ax, FAT1SectorStart    ; arg1=扇区号
     mov cl, 2                  ; arg2=读入的扇区数量 这里读取2个扇区，可以应对FAT表项跨扇区的情况
-    mov bx 8000h               ; arg3=目标缓冲区地址
+    mov bx, 8000h              ; arg3=目标缓冲区地址
     call Func_ReadSector
     pop dx
     add bx, dx          ; FAT表项所在的地址
@@ -210,9 +242,8 @@ Label_Even_2:
     ret
 
 
-
     ;========== Data (相当于 .data)
-StartBootMsg db "LzxOS Start Booting ...", 0
+StartBootMsg db "LzxOS Start Boot", 0
 NoLoaderMsg db "ERROR: Loader Not Found !!!", 0
 LoaderFileName db "LOADER  BIN", 0
 

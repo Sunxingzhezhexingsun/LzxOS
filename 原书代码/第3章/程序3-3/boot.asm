@@ -167,12 +167,12 @@ Label_FileName_Found:
 	add	di,	01ah
 	mov	cx,	word	[es:di]
 	push	cx
-	add	cx,	ax
-	add	cx,	SectorBalance
-	mov	ax,	BaseOfLoader
-	mov	es,	ax
-	mov	bx,	OffsetOfLoader
-	mov	ax,	cx
+	add	cx,	ax ; cx += 14
+	add	cx,	SectorBalance ;cx += 17
+	mov	ax,	BaseOfLoader ;ax=0x1000
+	mov	es,	ax			;es=0x1000
+	mov	bx,	OffsetOfLoader ;bx=0	es:bx
+	mov	ax,	cx			;ax=cluster+14+17  起始扇区号
 
 Label_Go_On_Loading_File:
 	push	ax
