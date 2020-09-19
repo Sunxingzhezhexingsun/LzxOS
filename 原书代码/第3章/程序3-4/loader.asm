@@ -179,17 +179,17 @@ Label_No_LoaderBin:
 ;=======	found loader.bin name in root director struct
 
 Label_FileName_Found:
-	mov	ax,	RootDirSectors
+	mov	ax,	RootDirSectors	;14
 	and	di,	0FFE0h
 	add	di,	01Ah
-	mov	cx,	word	[es:di]
+	mov	cx,	word	[es:di] ;DIR_FstClus
 	push	cx
-	add	cx,	ax
-	add	cx,	SectorBalance
+	add	cx,	ax				;14
+	add	cx,	SectorBalance	;17
 	mov	eax,	BaseTmpOfKernelAddr	;BaseOfKernelFile
 	mov	es,	eax
-	mov	bx,	OffsetTmpOfKernelFile	;OffsetOfKernelFile
-	mov	ax,	cx
+	mov	bx,	OffsetTmpOfKernelFile	;OffsetOfKernelFile , es:bx = buffer
+	mov	ax,	cx				; ax = 1th sector (data
 
 Label_Go_On_Loading_File:
 	push	ax
@@ -197,7 +197,7 @@ Label_Go_On_Loading_File:
 	mov	ah,	0Eh
 	mov	al,	'.'
 	mov	bl,	0Fh
-	int	10h
+	int	10h					; print "."
 	pop	bx
 	pop	ax
 
@@ -213,7 +213,7 @@ Label_Go_On_Loading_File:
 	push	ds
 	push	esi
 
-	mov	cx,	200h
+	mov	cx,	200h			; loop count = 512
 	mov	ax,	BaseOfKernelFile
 	mov	fs,	ax
 	mov	edi,	dword	[OffsetOfKernelFileCount]

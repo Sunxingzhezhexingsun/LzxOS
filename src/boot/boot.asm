@@ -241,7 +241,6 @@ Label_Even_2:
     pop es
     ret
 
-
     ;========== Data (相当于 .data)
 StartBootMsg db "LzxOS Start Boot", 0
 NoLoaderMsg db "ERROR: Loader Not Found !!!", 0
