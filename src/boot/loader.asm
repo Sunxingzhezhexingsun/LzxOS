@@ -12,7 +12,7 @@ OffsetOfKernelFile equ 0x100000 ;1MB kernel base
 BaseOfTmpKernelFile equ 0x00
 OffsetOfTmpKernelFile equ 0x7E00 ;0x7C00 + 512bytes  temp buffer of kernel
 
-MemoryStructBufferAddr equ 0x7E00 ; buffer of memory struct
+MemoryStructBuffer equ 0x7E00 ; buffer of memory struct
 
 ;=======    global descriptor table
 [SECTION gdt]
@@ -26,7 +26,7 @@ GdtPtr:     dw GdtLen
             dd Label_GDT
 
 SelectorCode32  equ Label_DESC_CODE32 - Label_GDT
-SelectorDate32  equ Label_DESC_DATA32 - Label_GDT
+SelectorData32  equ Label_DESC_DATA32 - Label_GDT
 
 [SECTION .s16]
 [BITS 16]
@@ -62,7 +62,7 @@ Label_Start:
     mov eax, cr0
     or eax, 00000001b
     mov cr0, eax    ; set CR0.PE, Protected Mode
-    mov ax, SelectorDate32
+    mov ax, SelectorData32
     mov fs, ax
     mov eax, cr0
     and eax, 111111110b
@@ -155,16 +155,17 @@ Label_Go_On_Loading_KernelBin:
     mov cl, 1
     call Func_ReadSector
     pop ax                      ;ax=簇号(FAT表项中的)     
-    ;;;;;;;;;;;;
+    ;;;;;;;;;;;;                copy sector from tmp to kernelBase
     push eax
     push cx
     push edi
     push esi
     push ds
+
     mov cx, 200h
     ; mov ax, BaseOfKernelFile
     ; mov fs, ax
-    mov edi, OffsetOfKernelFile
+    mov edi, dword [OffsetOfKernelFileCount]
     mov esi, OffsetOfTmpKernelFile
     mov ax, BaseOfTmpKernelFile
     mov ds, ax
@@ -174,25 +175,76 @@ Label_Mov_Kernel:
     inc esi
     inc edi
     loop Label_Mov_Kernel       ;loop [cx] times Label_Mov_Kernel
+    mov eax, 0x1000
+    mov ds, eax
+    mov dword [OffsetOfKernelFileCount], edi
+
     pop ds
     pop esi
     pop edi
     pop cx
     pop eax
     ;;;;;;;;;;
+    
     call Func_ParseFATEntry
     mov cx, ax
     cmp cx, 0fffh               ;FAT表项内容为0xfff表示这是文件的最后一个簇
     jz Label_Load_KernelBin_Done    ;kernel.bin加载完成
     jmp Label_Go_On_Loading_KernelBin   ;继续加载下一个簇到内存
+
+;========== load kernel.bin done
 Label_Load_KernelBin_Done:
     mov	ax, 0B800h
-	mov	gs, ax
-	mov	ah, 0Fh				; 0000: 黑底    1111: 白字
-	mov	al, 'G'
-	mov	[gs:((80 * 0 + 39) * 2)], ax	; 屏幕第 0 行, 第 39 列。
+    mov	gs, ax
+    mov	ah, 0Fh				; 0000: 黑底    1111: 白字
+    mov	al, 'G'
+    mov	[gs:((80 * 0 + 39) * 2)], ax	; 屏幕第 0 行, 第 39 列。
+;========== Kill Motor, 关闭软盘驱动马达
+    push dx
+    mov dx, 3F2h
+    mov al, 0
+    out dx, al          ; 端口号必须为8位常量或16位dx中的值
+    pop dx
+
+;========== Get Memory Map Struct
+    mov bx, 0       ;style
+    mov	cx,	23      ;length
+    mov	dx,	0400h   ;DH=游标行号  DL=游标列号
+    mov bp, StartGetMemStructMsg
+    call Func_PrintLine
+
+    mov ax, 00h
+    mov es, ax
+    mov di, MemoryStructBuffer
+    xor ebx, ebx
+
+Label_Get_Mem_Struct:
+    ; mov edx, 534D4150h
+    mov edx, [SMAP]
+    mov eax, 0E820h
+    mov ecx, 20
+    int 15h
+    jc Label_Get_Mem_Fail
+    add di, 20
+    cmp ebx, 0
+    jnz Label_Get_Mem_Struct
+    jmp Label_Get_Mem_Done
+
+Label_Get_Mem_Fail:
+    mov bx, 1
+    mov cx, 23
+    mov dx, 0600h   ;row 6
+    mov bp, GetMemStructErrMessage
+    call Func_PrintLine
     jmp $
 
+Label_Get_Mem_Done:
+    mov bx, 0
+    mov cx, 29
+    mov dx, 0600h   ;row 6
+    mov bp, GetMemStructOKMessage
+    call Func_PrintLine
+    jmp $
 
 
 ;========== 函数Func_ReadSector 从软盘中读取N个扇区
@@ -263,17 +315,49 @@ Label_Even_2:
     pop es
     ret
 
+;========== Print One Line 打印一行字符串
+; arg1 BX = Style (0=common, !0=warnning)
+; arg1 CX = length of string
+; arg2 DH = line number, DL = column number
+; arg3 BP = pointer to message
+Func_PrintLine:
+    push bx
+    push es
+    push ax
+    cmp bx, 0
+    jnz Label_Warn
+    mov	bx,	000Fh
+    jmp Label_Continue
+Label_Warn:
+    mov bx, 008Ch
+Label_Continue:
+    mov	ax,	ds
+    mov	es,	ax
+    mov	ax,	1301h
+    
+    int 10h
+    pop ax
+    pop es
+    pop bx
+    ret
 
 ;=======	Data (.data)
 StartLoaderMessage:	db	"LzxOS Start Loader", 0
 KernelFileName: db "KERNEL  BIN", 0
 NoKernelMsg: db "Kernel not found !!!", 0
 KernelFoundMsg: db "Kernel found", 0
+StartGetMemStructMsg: db "Start Get Memory Struct", 0
+GetMemStructErrMessage:	db	"Get Memory Struct ERROR", 0
+GetMemStructOKMessage:	db	"Get Memory Struct Successful!"
+SMAP: db "PAMS"
+      db 0*28
+
 
 ;========== Variable (相当于 .bss)
-SectorNumber dw 0
-RootDirSizeForLoop dw TotalRootDirSectors
-Odd db 0  ;FAT表项的奇偶校验位
+SectorNumber: dw 0
+RootDirSizeForLoop: dw TotalRootDirSectors
+Odd: db 0  ;FAT表项的奇偶校验位
+OffsetOfKernelFileCount: dd OffsetOfKernelFile
 
 times 512*5-($-$$) db 0   ;用0字节填充5个扇区
 
